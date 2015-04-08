@@ -15,7 +15,7 @@ Package.describe({
 Package.onUse(function(api) {
   api.versionsFrom('1.0');
   api.use([
-    'momentjs:moment'
+    'momentjs:moment@2.10.0'
   ]);
 
   api.addFiles([
