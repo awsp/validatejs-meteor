@@ -1,6 +1,6 @@
 Meteor package of validate.js
 --------------------------------------------
-A meteor package wrapper for [validate.js](http://validatejs.org/) library! 
+A meteor package wrapper for [validate.js](http://validatejs.org/) library @version 0.6.1!
 
 Current Package Version: 0.3.0
 
