@@ -1,3 +1,5 @@
+"use strict";
+
 Package.describe({
   name: 'awsp:validatejs',
   version: '0.3.0',
@@ -12,14 +14,14 @@ Package.describe({
 
 Package.onUse(function(api) {
   api.versionsFrom('1.0');
-  api.addFiles('validatejs.js');
   api.use([
     'momentjs:moment'
   ]);
 
   api.addFiles([
+    'validatejs.js',
     'bower_components/validate/validate.js'
-  ], 'client');
+  ]);
 });
 
 Package.onTest(function(api) {

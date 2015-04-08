@@ -19,8 +19,8 @@ meteor add awsp:validatejs
 
 
 ## Usage
-###Example
 ```js
+// Example 1
 var constraints = {
   username: {
     format: {
@@ -33,6 +33,18 @@ var constraints = {
 
 validate({username: "Nicklas!"}, constraints);
 // => {"username": ["Username can only contain a-z and 0-9"]}
+
+// Example 2
+var constraints = {
+  from: {
+    email: true
+  }
+};
+validate({from: "foobar"}, constraints);
+// => {"email": ["From doesn't look like a valid email"]}
+
+validate({from: "test@example.com"}, constraints);
+// => undefined
 ```
 For more example please visit the offical site.
 
