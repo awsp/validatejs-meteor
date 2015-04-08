@@ -46,7 +46,7 @@ validate({from: "foobar"}, constraints);
 validate({from: "test@example.com"}, constraints);
 // => undefined
 ```
-For more example please visit the offical site.
+For more example please visit the official site.
 
 
 
