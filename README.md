@@ -1,8 +1,8 @@
 Meteor package of validate.js
 --------------------------------------------
-A meteor package wrapper for [validate.js](http://validatejs.org/) library @version 0.6.1!
+A meteor package wrapper for [validate.js](http://validatejs.org/) library @version 0.7.0!
 
-Current Package Version: 0.3.1
+Current Package Version: 0.4.0
 
 
 ## Installation
@@ -52,6 +52,12 @@ For more example please visit the official site.
 
 ## Github / Bug Reports
 https://github.com/awsp/validatejs-meteor
+
+
+
+## Change Logs
+* 0.4.0 - Complete TinyTest, bump ValidateJS version to 0.7.0.
+* 0.3.1 - Public Release to atmosphere
 
 
 
