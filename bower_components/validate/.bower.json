@@ -1,7 +1,7 @@
 {
-  "name": "validate.js",
+  "name": "validate",
   "main": "validate.js",
-  "version": "0.7.1",
+  "version": "0.8.0",
   "ignore": [
     "**/.*",
     "CNAME",
@@ -19,13 +19,13 @@
     "library"
   ],
   "homepage": "https://github.com/ansman/validate.js",
-  "_release": "0.7.1",
+  "_release": "0.8.0",
   "_resolution": {
     "type": "version",
-    "tag": "0.7.1",
-    "commit": "6a4393458931e18f24acc170ae1b1d9b4b0d9f0f"
+    "tag": "0.8.0",
+    "commit": "c44e06e4be198c69e99145e3ea857c2036e61a33"
   },
   "_source": "git://github.com/ansman/validate.js.git",
-  "_target": "~0.7.1",
+  "_target": "~0.8.0",
   "_originalSource": "validate"
 }

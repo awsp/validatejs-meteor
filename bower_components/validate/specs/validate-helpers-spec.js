@@ -667,7 +667,7 @@ describe("validate", function() {
         warn: jasmine.createSpy("warn")
       };
       validate.warn("Msg");
-      expect(window.console.warn).toHaveBeenCalledWith("Msg");
+      expect(window.console.warn).toHaveBeenCalledWith("[validate.js] Msg");
     });
   });
 
@@ -687,7 +687,7 @@ describe("validate", function() {
         error: jasmine.createSpy("error")
       };
       validate.error("Msg");
-      expect(window.console.error).toHaveBeenCalledWith("Msg");
+      expect(window.console.error).toHaveBeenCalledWith("[validate.js] Msg");
     });
   });
 
@@ -811,6 +811,7 @@ describe("validate", function() {
   });
 
   describe("collectFormValues", function() {
+
     it("handles empty input", function() {
       expect(validate.collectFormValues()).toEqual({});
     });
@@ -849,7 +850,9 @@ describe("validate", function() {
         '  <option>' +
         '  <option value="option1">' +
         '  <option value="option2">' +
-        '</select>';
+        '</select>' +
+        '<textarea name="textarea-ignored" data-ignored>the textarea</textarea>'+
+        '<textarea name="textarea">the textarea</textarea>';
 
       expect(validate.collectFormValues(form)).toEqual({
         text: "example text",
@@ -867,8 +870,9 @@ describe("validate", function() {
         "checked-radio": "radio2",
         "unchecked-radio": null,
         "selected-dropdown": "option2",
-        "unselected-dropdown": null
-      });
+        "unselected-dropdown": null,
+        "textarea": "the textarea"
+        });
     });
 
     it("has an option to nullify empty and trim strings", function() {
@@ -921,6 +925,17 @@ describe("validate", function() {
         unchecked: false
       });
     });
+
+    it("accepts jquery elements", function() {
+      var $form = $('<form><input value="foobar" name="input" /></form>');
+      expect(validate.collectFormValues($form)).toEqual({
+        input: "foobar"
+      });
+    });
+
+    it("empty jquery collections return empty objects", function() {
+      expect(validate.collectFormValues($())).toEqual({});
+    });
   });
 
   describe("isDomElement", function() {
@@ -942,6 +957,116 @@ describe("validate", function() {
       expect(validate.isDomElement("foo")).toBe(false);
       expect(validate.isDomElement("")).toBe(false);
       expect(validate.isDomElement([])).toBe(false);
+    });
+  });
+
+  describe("cleanAttributes", function() {
+    it("handles null for both inputs", function() {
+      expect(validate.cleanAttributes(null, {})).toEqual({});
+      expect(validate.cleanAttributes({}, null)).toEqual({});
+      expect(validate.cleanAttributes(null, null)).toEqual({});
+    });
+
+    it("always returns a copy", function() {
+      var obj = {};
+      expect(validate.cleanAttributes(obj, {})).not.toBe(obj);
+    });
+
+    it("returns a copy of the attributes with only the whitelisted attributes", function() {
+      var input = {
+        foo: "foo",
+        bar: "bar",
+        baz: "baz"
+      };
+
+      expect(validate.cleanAttributes(input, {})).toEqual({});
+      expect(validate.cleanAttributes(input, {foo: true})).toEqual({
+        foo: "foo"
+      });
+      expect(validate.cleanAttributes(input, {foo: true, bar: true})).toEqual({
+        foo: "foo",
+        bar: "bar"
+      });
+      expect(validate.cleanAttributes(input, {foo: true, bar: true, baz: true})).toEqual({
+        foo: "foo",
+        bar: "bar",
+        baz: "baz"
+      });
+      expect(validate.cleanAttributes(input, {foo: false})).toEqual({});
+    });
+
+    it("handles nested objects", function() {
+      var attributes = {
+        "foo.bar.baz": "foobarbaz",
+        foo: {
+          shouldBeRemoved: "yup",
+          bar: {
+            shouldAlsoBeRemoved: "uhuh",
+            baz: "baz",
+            quux: "quux"
+          }
+        },
+        one: {
+          two: {
+            four: "shouldBeRemoved"
+          }
+        },
+        somethingThatIsNull: null
+      };
+
+      var whitelist = {
+        "foo\\.bar\\.baz": true,
+        "foo.bar.baz": true,
+        "foo.bar.quux": true,
+        "one.two.three": true,
+        "somethingThatIsNull.someSubThingie": true
+      };
+      expect(validate.cleanAttributes(attributes, whitelist)).toEqual({
+        "foo.bar.baz": "foobarbaz",
+        foo: {
+          bar: {
+            baz: "baz",
+            quux: "quux"
+          }
+        },
+        one: {
+          two: {
+          }
+        },
+        somethingThatIsNull: null
+      });
+    });
+
+    it("works with constraints", function() {
+      var attributes = {
+        name: "Test",
+        description: "Yaay",
+        createdAt: 'omgomg',
+        address: {
+          street: "Some street",
+          postal: "47 111"
+        }
+      };
+
+      var constraints = {
+        name: {
+          presence: true
+        },
+        description: {},
+        "address.street": {},
+        "address.postal": {},
+        "address.country": {}
+      };
+
+      expect(validate.cleanAttributes(attributes, constraints)).not.toBe(attributes);
+      expect(validate.cleanAttributes(attributes, constraints)).toEqual({
+        name: "Test",
+        description: "Yaay",
+        address: {
+          street: "Some street",
+          postal: "47 111"
+        }
+      });
     });
   });
 });
