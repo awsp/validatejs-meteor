@@ -39,7 +39,7 @@
   // Copies over attributes from one or more sources to a single destination.
   // Very much similar to underscore's extend.
   // The first argument is the target object and the remaining arguments will be
-  // used as targets.
+  // used as sources.
   v.extend = function(obj) {
     [].slice.call(arguments, 1).forEach(function(source) {
       for (var attr in source) {
@@ -54,9 +54,9 @@
     // The toString function will allow it to be coerced into a string
     version: {
       major: 0,
-      minor: 7,
-      patch: 1,
-      metadata: null,
+      minor: 8,
+      patch: 0,
+      metadata: "",
       toString: function() {
         var version = v.format("%{major}.%{minor}.%{patch}", v.version);
         if (!v.isEmpty(v.version.metadata)) {
@@ -77,7 +77,6 @@
     // If moment is used in node, browserify etc please set this attribute
     // like this: `validate.moment = require("moment");
     moment: typeof moment !== "undefined" ? moment : /* istanbul ignore next */ null,
-
     XDate: typeof XDate !== "undefined" ? XDate : /* istanbul ignore next */ null,
 
     EMPTY_STRING_REGEXP: /^\s*$/,
@@ -95,7 +94,7 @@
         , validatorOptions
         , error;
 
-      if (v.isDomElement(attributes)) {
+      if (v.isDomElement(attributes) || v.isJqueryElement(attributes)) {
         attributes = v.collectFormValues(attributes);
       }
 
@@ -179,13 +178,23 @@
     // It can be called even if no validations returned a promise.
     async: function(attributes, constraints, options) {
       options = v.extend({}, v.async.options, options);
+
+      var WrapErrors = options.wrapErrors || function(errors) {
+        return errors;
+      };
+
+      // Removes unknown attributes
+      if (options.cleanAttributes !== false) {
+        attributes = v.cleanAttributes(attributes, constraints);
+      }
+
       var results = v.runValidations(attributes, constraints, options);
 
       return new v.Promise(function(resolve, reject) {
         v.waitForResults(results).then(function() {
           var errors = v.processValidationResults(results, options);
           if (errors) {
-            reject(errors);
+            reject(new WrapErrors(errors, options, attributes, constraints));
           } else {
             resolve(attributes);
           }
@@ -218,17 +227,15 @@
 
         return memo.then(function() {
           return result.error.then(
-            function() {
-              result.error = null;
+            function(error) {
+              result.error = error || null;
             },
             function(error) {
-              // If for some reason the validator promise was rejected but no
-              // error was specified.
-              if (!error) {
-                v.warn("Validator promise was rejected but didn't return an error");
-              } else if (error instanceof Error) {
+              if (error instanceof Error) {
                 throw error;
               }
+              console.log("Foo");
+              v.error("Rejecting promises with the result is deprecated. Please use the resolve callback instead.");
               result.error = error;
             }
           );
@@ -288,6 +295,10 @@
     // function is considered a promise.
     isPromise: function(p) {
       return !!p && v.isFunction(p.then);
+    },
+
+    isJqueryElement: function(o) {
+      return o && v.isString(o.jquery);
     },
 
     isDomElement: function(o) {
@@ -435,8 +446,8 @@
       return value in obj;
     },
 
-    getDeepObjectValue: function(obj, keypath) {
-      if (!v.isObject(obj) || !v.isString(keypath)) {
+    forEachKeyInKeypath: function(object, keypath, callback) {
+      if (!v.isString(keypath)) {
         return undefined;
       }
 
@@ -450,11 +461,9 @@
             if (escape) {
               escape = false;
               key += '.';
-            } else if (key in obj) {
-              obj = obj[key];
-              key = "";
             } else {
-              return undefined;
+              object = callback(object, key, false);
+              key = "";
             }
             break;
 
@@ -474,11 +483,19 @@
         }
       }
 
-      if (v.isDefined(obj) && key in obj) {
-        return obj[key];
-      } else {
+      return callback(object, key, true);
+    },
+
+    getDeepObjectValue: function(obj, keypath) {
+      if (!v.isObject(obj)) {
         return undefined;
       }
+
+      return v.forEachKeyInKeypath(obj, keypath, function(obj, key) {
+        if (v.isObject(obj)) {
+          return obj[key];
+        }
+      });
     },
 
     // This returns an object with all the values of the form.
@@ -494,13 +511,17 @@
         , inputs
         , value;
 
+      if (v.isJqueryElement(form)) {
+        form = form[0];
+      }
+
       if (!form) {
         return values;
       }
 
       options = options || {};
 
-      inputs = form.querySelectorAll("input[name]");
+      inputs = form.querySelectorAll("input[name], textarea[name]");
       for (i = 0; i < inputs.length; ++i) {
         input = inputs.item(i);
 
@@ -630,6 +651,56 @@
       return errors.map(function(error) { return error.error; });
     },
 
+    cleanAttributes: function(attributes, whitelist) {
+      function whitelistCreator(obj, key, last) {
+        if (v.isObject(obj[key])) {
+          return obj[key];
+        }
+        return (obj[key] = last ? true : {});
+      }
+
+      function buildObjectWhitelist(whitelist) {
+        var ow = {}
+          , lastObject
+          , attr;
+        for (attr in whitelist) {
+          if (!whitelist[attr]) {
+            continue;
+          }
+          v.forEachKeyInKeypath(ow, attr, whitelistCreator);
+        }
+        return ow;
+      }
+
+      function cleanRecursive(attributes, whitelist) {
+        if (!v.isObject(attributes)) {
+          return attributes;
+        }
+
+        var ret = v.extend({}, attributes)
+          , w
+          , attribute;
+
+        for (attribute in attributes) {
+          w = whitelist[attribute];
+
+          if (v.isObject(w)) {
+            ret[attribute] = cleanRecursive(ret[attribute], w);
+          } else if (!w) {
+            delete ret[attribute];
+          }
+        }
+        return ret;
+      }
+
+      if (!v.isObject(whitelist) || !v.isObject(attributes)) {
+        return {};
+      }
+
+      whitelist = buildObjectWhitelist(whitelist);
+      return cleanRecursive(attributes, whitelist);
+    },
+
     exposeModule: function(validate, root, exports, module, define) {
       if (exports) {
         if (module && module.exports) {
@@ -646,13 +717,13 @@
 
     warn: function(msg) {
       if (typeof console !== "undefined" && console.warn) {
-        console.warn(msg);
+        console.warn("[validate.js] " + msg);
       }
     },
 
     error: function(msg) {
       if (typeof console !== "undefined" && console.error) {
-        console.error(msg);
+        console.error("[validate.js] " + msg);
       }
     }
   });
@@ -834,7 +905,7 @@
 
         if (v.isFunction(v.XDate)) {
           format = format || (options.dateOnly ? "yyyy-MM-dd" : "yyyy-MM-dd HH:mm:ss");
-          return new XDate(date, true).toString(format);
+          return new v.XDate(date, true).toString(format);
         }
 
         if (v.isDefined(v.moment)) {

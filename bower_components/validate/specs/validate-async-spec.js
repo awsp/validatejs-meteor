@@ -7,10 +7,18 @@ describe("validate.async", function() {
     success = jasmine.createSpy("success");
     error = jasmine.createSpy("error");
 
-    validate.validators.asyncFail = function() {
+    validate.validators.asyncFailReject = function() {
       return new validate.Promise(function(resolve, reject) {
         setTimeout(function() {
           reject("failz");
+        }, 1);
+      });
+    };
+
+    validate.validators.asyncFail = function() {
+      return new validate.Promise(function(resolve, reject) {
+        setTimeout(function() {
+          resolve("failz");
         }, 1);
       });
     };
@@ -25,6 +33,7 @@ describe("validate.async", function() {
   });
 
   afterEach(function() {
+    delete validate.validators.asyncFailReject;
     delete validate.validators.asyncFail;
     delete validate.validators.asyncSuccess;
     delete validate.validators.asyncError;
@@ -53,8 +62,9 @@ describe("validate.async", function() {
   });
 
   it.promise("resolves the promise if all constraints pass", function() {
-    var attrs = {foo: "bar"};
-    return validate.async(attrs, {}).then(success, error).then(function() {
+    var attrs = {foo: "bar"}
+      , constraints = {foo: {presence: true}};
+    return validate.async(attrs, constraints).then(success, error).then(function() {
       expect(error).not.toHaveBeenCalled();
       expect(success).toHaveBeenCalledWith(attrs);
     });
@@ -77,6 +87,19 @@ describe("validate.async", function() {
     };
     return validate.async({}, c).then(success, error).then(function() {
       expect(success).not.toHaveBeenCalled();
+      expect(error).toHaveBeenCalledWith({
+        name: ["Name failz"]
+      });
+    });
+  });
+
+  it.promise('handles validators resolving a promise with error', function() {
+    var c = {
+      name: {
+        asyncFail: true
+      }
+    };
+    return validate.async({}, c).then(success, error).then(function() {
       expect(error).toHaveBeenCalledWith({
         name: ["Name failz"]
       });
@@ -112,7 +135,7 @@ describe("validate.async", function() {
       });
     });
 
-    it.promise("handles results with no promises", function() {
+    it.promise("handles results with promises", function() {
       var results = [{
         attribute: "foo",
         error: new validate.Promise(function(resolve, reject) {
@@ -142,20 +165,20 @@ describe("validate.async", function() {
       });
     });
 
-    it.promise("warns if a promise is rejected without an error", function() {
-      spyOn(validate, "warn");
+    it.promise("still works with rejecting with an error but logs an error", function() {
+      spyOn(validate, "error");
 
       var results = [{
         attribute: "foo",
-        error: new validate.Promise(function(resolve, reject) { reject(); })
+        error: new validate.Promise(function(resolve, reject) { reject("foo"); })
       }];
 
       return validate.waitForResults(results).then(function() {
         expect(results).toEqual([{
           attribute: "foo",
-          error: undefined
+          error: "foo"
         }]);
-        expect(validate.warn).toHaveBeenCalled();
+        expect(validate.error).toHaveBeenCalled();
       });
     });
 
@@ -207,6 +230,75 @@ describe("validate.async", function() {
     return validate.async({}, c).then(success, error).then(function() {
       expect(success).not.toHaveBeenCalled();
       expect(error).toHaveBeenCalledWith(new Error("Some error"));
+    });
+  });
+
+  it.promise("cleans the attributes per default", function() {
+    var attrs = {foo: "bar"}
+      , constraints = {bar: {presence: true}}
+      , cleaned = {bar: "foo"};
+
+    spyOn(validate, "cleanAttributes").and.returnValue(cleaned);
+
+    return validate.async(attrs, constraints).then(success, error).then(function() {
+      expect(error).not.toHaveBeenCalled();
+      expect(success).toHaveBeenCalledWith(cleaned);
+      expect(validate.cleanAttributes).toHaveBeenCalledWith(attrs, constraints);
+    });
+  });
+
+  it.promise("doesn't cleans the attributes is cleanAttributes: false", function() {
+    var attrs = {foo: "bar"}
+      , constraints = {foo: {presence: true}}
+      , cleaned = {bar: "foo"};
+
+    spyOn(validate, "cleanAttributes").and.returnValue(cleaned);
+
+    return validate.async(attrs, constraints, {cleanAttributes: false}).then(success, error).then(function() {
+      expect(error).not.toHaveBeenCalled();
+      expect(success).toHaveBeenCalledWith(attrs);
+      expect(validate.cleanAttributes).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("wrapping errors", function() {
+    it.promise("it allows you to wrap errors using a custom function", function() {
+      validate.async.options = {someOption: "someValue"};
+
+      var attrs = {foo: "bar", bar: "foo"}
+        , originalConstraints = {foo: {numericality: true}}
+        , wrapped = {attr: ["errors"]}
+        , wrapper = jasmine.createSpy("wrapper").and.callFake(function(errors, options, attributes, constraints) {
+            expect(errors).toEqual({foo: ["Foo is not a number"]});
+            // The options should have been merged with the default options
+            expect(options).toEqual({
+              wrapErrors: wrapper,
+              someOption: "someValue"
+            });
+            expect(attributes).toEqual({foo: "bar"});
+            expect(constraints).toBe(originalConstraints);
+            return wrapped;
+          })
+        , originalOptions = {wrapErrors: wrapper};
+
+      return validate.async(attrs, originalConstraints, originalOptions).then(success, error).then(function() {
+        expect(wrapper).toHaveBeenCalled();
+        expect(error).toHaveBeenCalledWith(wrapped);
+        expect(success).not.toHaveBeenCalled();
+      });
+    });
+
+    it.promise("calls the wrapper function with the new keyword", function() {
+      var wrapper = jasmine.createSpy("wrapper").and.callFake(function(errors) {
+        expect(this.constructor).toBe(wrapper);
+        return errors;
+      });
+
+      return validate.async({}, {foo: {presence: true}}, {wrapErrors: wrapper}).then(success, error).then(function() {
+        expect(error).toHaveBeenCalled();
+        expect(success).not.toHaveBeenCalled();
+        expect(wrapper).toHaveBeenCalled();
+      });
     });
   });
 });
