@@ -2,7 +2,7 @@
 
 Package.describe({
     name: 'awsp:validatejs',
-    version: '0.5.0',
+    version: '0.6.0',
     // Brief, one-line summary of the package.
     summary: 'Meteor package for validate.js library. ',
     // URL to the Git repository containing the source code for this package.
